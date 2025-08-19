@@ -24,14 +24,29 @@ body {
     height: 85vh;
     background-color: #CB6120;
     border-radius: 24px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+}
+
+.left-column {
     display: flex;
     align-items: center;
-    justify-content: center;
+    padding-left: 15%;
+}
+
+.right-column {
+    /* Empty for now */
 }
 
 h1 {
+    font-family: "Nunito", sans-serif;
     font-size: clamp(3rem, 6vw, 5rem);
     font-weight: 700;
     letter-spacing: -1.5px;
-    color: #F6E2A0;
+    color: #FAEEC6;
+}
+
+h1 span {
+    display: block;
+    line-height: 1.1;
 }
