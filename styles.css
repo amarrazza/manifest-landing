@@ -20,8 +20,8 @@ body {
 }
 
 .card {
-    width: 80vw;
-    height: 80vh;
+    width: 85vw;
+    height: 85vh;
     background-color: #CB6120;
     border-radius: 24px;
     display: flex;
