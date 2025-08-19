@@ -19,15 +19,19 @@ body {
     justify-content: center;
 }
 
-.container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 20px;
-    text-align: center;
+.card {
+    width: 80vw;
+    height: 80vh;
+    background-color: #CB6120;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 h1 {
     font-size: clamp(3rem, 6vw, 5rem);
     font-weight: 700;
     letter-spacing: -1.5px;
+    color: #F6E2A0;
 }
