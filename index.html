@@ -28,17 +28,115 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/intlTelInput.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script>
+        // Initialize Supabase client
+        const supabaseUrl = 'https://vxslsmwkmfcbpdtmoigw.supabase.co';
+        const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c2xzbXdrbWZjYnBkdG1vaWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2Mzg1NzgsImV4cCI6MjA3MTIxNDU3OH0.yKEZJkS8SvQEtJSx2gZ_xYE85S1DCGgyJs3Dnhz2uBI';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
+
+        // Initialize phone input
         const input = document.querySelector("#phone");
+        const submitBtn = document.querySelector(".submit-btn");
+        let userCountry = 'us';
+        
         const iti = window.intlTelInput(input, {
             initialCountry: "auto",
             geoIpLookup: function(success, failure) {
                 fetch("https://ipapi.co/json")
                     .then(res => res.json())
-                    .then(data => success(data.country_code))
+                    .then(data => {
+                        userCountry = data.country_code;
+                        success(data.country_code);
+                    })
                     .catch(() => success("us"));
             },
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/utils.js"
+        });
+
+        // Handle form submission
+        submitBtn.addEventListener('click', async function() {
+            // Disable button and show loading state
+            submitBtn.disabled = true;
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Joining...';
+
+            try {
+                // Get the phone number
+                const phoneNumber = iti.getNumber();
+                
+                // Debug logging
+                console.log('Input value:', input.value);
+                console.log('Formatted number:', phoneNumber);
+                console.log('Is valid (strict):', iti.isValidNumber());
+                
+                // Validate phone number with fallback
+                // If utils isn't loaded or validation fails, do basic check
+                if (input.value.trim() === '') {
+                    throw new Error('Please enter a phone number');
+                }
+                
+                // Basic validation: check if we have a reasonable phone number
+                // Allow if it's either strictly valid OR looks like a phone number
+                const hasReasonableLength = input.value.replace(/\D/g, '').length >= 10;
+                const isStrictlyValid = iti.isValidNumber && iti.isValidNumber();
+                
+                if (!isStrictlyValid && !hasReasonableLength) {
+                    throw new Error('Please enter a valid phone number');
+                }
+                
+                // Use E.164 format if available, otherwise format it ourselves
+                const finalPhoneNumber = phoneNumber || '+1' + input.value.replace(/\D/g, '');
+                const countryData = iti.getSelectedCountryData();
+
+                // Insert into Supabase
+                const { data, error } = await supabase
+                    .from('waitlist')
+                    .insert({
+                        phone_number: finalPhoneNumber,
+                        country_code: countryData.iso2.toUpperCase(),
+                        ip_country: userCountry ? userCountry.toUpperCase() : null
+                    });
+
+                if (error) {
+                    // Handle duplicate entry
+                    if (error.code === '23505') {
+                        throw new Error('This number is already on the waitlist!');
+                    }
+                    throw error;
+                }
+
+                // Success - show feedback
+                submitBtn.textContent = '✓ You\'re on the list!';
+                submitBtn.style.backgroundColor = '#2d7a2d';
+                input.value = '';
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    submitBtn.textContent = originalText;
+                    submitBtn.style.backgroundColor = '';
+                    submitBtn.disabled = false;
+                }, 3000);
+
+            } catch (error) {
+                // Show error message
+                submitBtn.textContent = error.message || 'Something went wrong';
+                submitBtn.style.backgroundColor = '#d32f2f';
+                
+                // Reset after 3 seconds
+                setTimeout(() => {
+                    submitBtn.textContent = originalText;
+                    submitBtn.style.backgroundColor = '';
+                    submitBtn.disabled = false;
+                }, 3000);
+            }
+        });
+
+        // Allow Enter key to submit
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !submitBtn.disabled) {
+                submitBtn.click();
+            }
         });
     </script>
 </body>
