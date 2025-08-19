@@ -50,3 +50,19 @@ h1 span {
     display: block;
     line-height: 1.1;
 }
+
+@media (max-width: 768px) {
+    .card {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr 1fr;
+    }
+    
+    .left-column {
+        padding-left: 0;
+        justify-content: center;
+    }
+    
+    h1 {
+        text-align: center;
+    }
+}
