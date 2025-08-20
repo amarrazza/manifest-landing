@@ -39,6 +39,11 @@
         const input = document.querySelector("#phone");
         const submitBtn = document.querySelector(".submit-btn");
         let userCountry = 'us';
+        let utilsLoaded = false;
+        
+        // Disable submit button by default until utils are loaded
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Loading...';
         
         const iti = window.intlTelInput(input, {
             initialCountry: "auto",
@@ -54,8 +59,39 @@
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/utils.js"
         });
 
+        // Wait for utils script to load
+        iti.promise.then(() => {
+            console.log('utils loaded');
+            utilsLoaded = true;
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Join the Waitlist';
+        }).catch(() => {
+            console.error('Failed to load utils script');
+            // Fallback: check if utils are already loaded
+            if (window.intlTelInputUtils) {
+                console.log('utils loaded (fallback)');
+                utilsLoaded = true;
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Join the Waitlist';
+            } else {
+                // Still enable button but with limited functionality
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Join the Waitlist';
+            }
+        });
+
         // Handle form submission
         submitBtn.addEventListener('click', async function() {
+            // Guard: Block submission if utils haven't loaded yet
+            if (!utilsLoaded && !window.intlTelInputUtils) {
+                console.warn('Utils not loaded yet, blocking submission');
+                submitBtn.textContent = 'Please wait...';
+                setTimeout(() => {
+                    submitBtn.textContent = 'Join the Waitlist';
+                }, 1000);
+                return;
+            }
+            
             // Disable button and show loading state
             submitBtn.disabled = true;
             const originalText = submitBtn.textContent;
