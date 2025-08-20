@@ -45,15 +45,6 @@
             return deviceId;
         }
 
-        // Simple hash function for IP
-        async function hashIP(ip) {
-            const encoder = new TextEncoder();
-            const data = encoder.encode(ip + 'manifest_salt_2025');
-            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-            const hashArray = Array.from(new Uint8Array(hashBuffer));
-            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-            return hashHex.substring(0, 16); // Return first 16 chars for brevity
-        }
 
         // Get current UTC date string (YYYY-MM-DD)
         function getUTCDateString() {
@@ -71,17 +62,13 @@
             localStorage.setItem('manifest_rate_limits', JSON.stringify(data));
         }
 
-        // Check if rate limited
-        async function checkRateLimits(userIP) {
+        // Check if rate limited (device only now, IP is server-side)
+        function checkDeviceRateLimit() {
             const deviceId = getOrCreateDeviceId();
-            const ipHash = await hashIP(userIP);
             const today = getUTCDateString();
             const rateLimits = getRateLimitData();
 
             // Clean up old data (not today)
-            Object.keys(rateLimits.ip_submissions).forEach(date => {
-                if (date !== today) delete rateLimits.ip_submissions[date];
-            });
             Object.keys(rateLimits.device_submissions).forEach(date => {
                 if (date !== today) delete rateLimits.device_submissions[date];
             });
@@ -92,33 +79,22 @@
                 return { limited: true, reason: 'Device limit reached (1 per day). Try again tomorrow.' };
             }
 
-            // Check IP limit (3 per day)
-            const ipCount = rateLimits.ip_submissions[today]?.[ipHash] || 0;
-            if (ipCount >= 3) {
-                return { limited: true, reason: 'IP limit reached (3 per day). Try again tomorrow.' };
-            }
-
-            return { limited: false, deviceId, ipHash };
+            return { limited: false, deviceId };
         }
 
-        // Record submission for rate limiting
-        async function recordSubmission(userIP) {
+        // Record submission for rate limiting (device only now)
+        function recordDeviceSubmission() {
             const deviceId = getOrCreateDeviceId();
-            const ipHash = await hashIP(userIP);
             const today = getUTCDateString();
             const rateLimits = getRateLimitData();
 
             // Initialize today's data if needed
-            if (!rateLimits.ip_submissions[today]) {
-                rateLimits.ip_submissions[today] = {};
-            }
             if (!rateLimits.device_submissions[today]) {
                 rateLimits.device_submissions[today] = {};
             }
 
-            // Increment counters
-            rateLimits.ip_submissions[today][ipHash] = (rateLimits.ip_submissions[today][ipHash] || 0) + 1;
-            rateLimits.device_submissions[today][deviceId] = 1; // Device is always 1 max
+            // Mark device as having submitted today
+            rateLimits.device_submissions[today][deviceId] = 1;
 
             saveRateLimitData(rateLimits);
         }
@@ -147,7 +123,6 @@
         let userCountry = 'us';
         let utilsLoaded = false;
         let cooldownInterval = null;
-        let userIP = null;
         
         // Disable submit button by default until utils are loaded
         submitBtn.disabled = true;
@@ -187,15 +162,13 @@
             return false; // No cooldown
         }
 
-        // Fetch user IP
+        // Fetch user country for phone input
         fetch("https://ipapi.co/json")
             .then(res => res.json())
             .then(data => {
-                userIP = data.ip;
                 userCountry = data.country_code;
             })
             .catch(() => {
-                userIP = 'unknown';
                 userCountry = 'us';
             });
         
@@ -209,7 +182,6 @@
                     fetch("https://ipapi.co/json")
                         .then(res => res.json())
                         .then(data => {
-                            userIP = data.ip;
                             userCountry = data.country_code;
                             success(data.country_code);
                         })
@@ -271,27 +243,15 @@
             submitBtn.textContent = 'Checking...';
 
             try {
-                // Check rate limits
-                if (!userIP) {
-                    // Try to fetch IP if we don't have it
-                    try {
-                        const ipResponse = await fetch("https://ipapi.co/json");
-                        const ipData = await ipResponse.json();
-                        userIP = ipData.ip;
-                    } catch {
-                        userIP = 'unknown';
-                    }
-                }
-
-                const rateLimitCheck = await checkRateLimits(userIP);
-                if (rateLimitCheck.limited) {
-                    throw new Error(rateLimitCheck.reason);
+                // Check device rate limit (client-side)
+                const deviceCheck = checkDeviceRateLimit();
+                if (deviceCheck.limited) {
+                    throw new Error(deviceCheck.reason);
                 }
 
                 submitBtn.textContent = 'Joining...';
                 
-                const deviceId = rateLimitCheck.deviceId;
-                const ipHash = rateLimitCheck.ipHash;
+                const deviceId = deviceCheck.deviceId;
                 // Get the phone number
                 const phoneNumber = iti.getNumber();
                 
@@ -319,27 +279,36 @@
                 const finalPhoneNumber = phoneNumber || '+1' + input.value.replace(/\D/g, '');
                 const countryData = iti.getSelectedCountryData();
 
-                // Insert into Supabase
-                const { data, error } = await supabase
-                    .from('waitlist')
-                    .insert({
+                // Call Edge Function instead of direct insert
+                const response = await fetch(`${supabaseUrl}/functions/v1/add-to-waitlist`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${supabaseAnonKey}`
+                    },
+                    body: JSON.stringify({
                         phone_number: finalPhoneNumber,
                         country_code: countryData.iso2.toUpperCase(),
                         ip_country: userCountry ? userCountry.toUpperCase() : null,
-                        device_id: deviceId,
-                        ip_hash: ipHash
-                    });
+                        device_id: deviceId
+                    })
+                });
 
-                if (error) {
-                    // Handle duplicate entry
-                    if (error.code === '23505') {
-                        throw new Error('This number is already on the waitlist!');
+                const result = await response.json();
+
+                if (!response.ok) {
+                    // Handle specific error codes
+                    if (result.code === 'RATE_LIMIT_IP') {
+                        throw new Error(result.error || 'IP limit reached (3 per day). Try again tomorrow.');
+                    } else if (result.code === 'DUPLICATE_PHONE') {
+                        throw new Error(result.error || 'This number is already on the waitlist!');
+                    } else {
+                        throw new Error(result.error || 'Failed to add to waitlist');
                     }
-                    throw error;
                 }
 
-                // Success - record submission for rate limiting
-                await recordSubmission(userIP);
+                // Success - record device submission for client-side rate limiting
+                recordDeviceSubmission();
 
                 // Success - show feedback
                 submitBtn.textContent = '✓ You\'re on the list!';
