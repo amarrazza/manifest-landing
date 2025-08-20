@@ -35,34 +35,198 @@
         const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4c2xzbXdrbWZjYnBkdG1vaWd3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2Mzg1NzgsImV4cCI6MjA3MTIxNDU3OH0.yKEZJkS8SvQEtJSx2gZ_xYE85S1DCGgyJs3Dnhz2uBI';
         const supabase = window.supabase.createClient(supabaseUrl, supabaseAnonKey);
 
+        // Device ID management
+        function getOrCreateDeviceId() {
+            let deviceId = localStorage.getItem('manifest_device_id');
+            if (!deviceId) {
+                deviceId = 'dev_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+                localStorage.setItem('manifest_device_id', deviceId);
+            }
+            return deviceId;
+        }
+
+        // Simple hash function for IP
+        async function hashIP(ip) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(ip + 'manifest_salt_2025');
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex.substring(0, 16); // Return first 16 chars for brevity
+        }
+
+        // Get current UTC date string (YYYY-MM-DD)
+        function getUTCDateString() {
+            const now = new Date();
+            return now.toISOString().split('T')[0];
+        }
+
+        // Rate limiting tracking
+        function getRateLimitData() {
+            const data = localStorage.getItem('manifest_rate_limits');
+            return data ? JSON.parse(data) : { ip_submissions: {}, device_submissions: {} };
+        }
+
+        function saveRateLimitData(data) {
+            localStorage.setItem('manifest_rate_limits', JSON.stringify(data));
+        }
+
+        // Check if rate limited
+        async function checkRateLimits(userIP) {
+            const deviceId = getOrCreateDeviceId();
+            const ipHash = await hashIP(userIP);
+            const today = getUTCDateString();
+            const rateLimits = getRateLimitData();
+
+            // Clean up old data (not today)
+            Object.keys(rateLimits.ip_submissions).forEach(date => {
+                if (date !== today) delete rateLimits.ip_submissions[date];
+            });
+            Object.keys(rateLimits.device_submissions).forEach(date => {
+                if (date !== today) delete rateLimits.device_submissions[date];
+            });
+            saveRateLimitData(rateLimits);
+
+            // Check device limit (1 per day)
+            if (rateLimits.device_submissions[today]?.[deviceId] >= 1) {
+                return { limited: true, reason: 'Device limit reached (1 per day). Try again tomorrow.' };
+            }
+
+            // Check IP limit (3 per day)
+            const ipCount = rateLimits.ip_submissions[today]?.[ipHash] || 0;
+            if (ipCount >= 3) {
+                return { limited: true, reason: 'IP limit reached (3 per day). Try again tomorrow.' };
+            }
+
+            return { limited: false, deviceId, ipHash };
+        }
+
+        // Record submission for rate limiting
+        async function recordSubmission(userIP) {
+            const deviceId = getOrCreateDeviceId();
+            const ipHash = await hashIP(userIP);
+            const today = getUTCDateString();
+            const rateLimits = getRateLimitData();
+
+            // Initialize today's data if needed
+            if (!rateLimits.ip_submissions[today]) {
+                rateLimits.ip_submissions[today] = {};
+            }
+            if (!rateLimits.device_submissions[today]) {
+                rateLimits.device_submissions[today] = {};
+            }
+
+            // Increment counters
+            rateLimits.ip_submissions[today][ipHash] = (rateLimits.ip_submissions[today][ipHash] || 0) + 1;
+            rateLimits.device_submissions[today][deviceId] = 1; // Device is always 1 max
+
+            saveRateLimitData(rateLimits);
+        }
+
+        // UI Cooldown management
+        function setCooldown() {
+            const cooldownExpiry = Date.now() + 45000; // 45 seconds
+            localStorage.setItem('manifest_cooldown_expiry', cooldownExpiry);
+            return cooldownExpiry;
+        }
+
+        function getCooldownRemaining() {
+            const expiry = localStorage.getItem('manifest_cooldown_expiry');
+            if (!expiry) return 0;
+            const remaining = parseInt(expiry) - Date.now();
+            return remaining > 0 ? remaining : 0;
+        }
+
+        function clearCooldown() {
+            localStorage.removeItem('manifest_cooldown_expiry');
+        }
+
         // Initialize phone input
         const input = document.querySelector("#phone");
         const submitBtn = document.querySelector(".submit-btn");
         let userCountry = 'us';
         let utilsLoaded = false;
+        let cooldownInterval = null;
+        let userIP = null;
         
         // Disable submit button by default until utils are loaded
         submitBtn.disabled = true;
         submitBtn.textContent = 'Loading...';
         
+        // Cooldown UI update function
+        function updateCooldownUI(forceShow = false) {
+            const remaining = getCooldownRemaining();
+            if (remaining > 0) {
+                if (forceShow) {
+                    const seconds = Math.ceil(remaining / 1000);
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = `Wait ${seconds}s`;
+                    submitBtn.style.backgroundColor = '#666';
+                    
+                    if (!cooldownInterval) {
+                        cooldownInterval = setInterval(() => {
+                            const newRemaining = getCooldownRemaining();
+                            if (newRemaining <= 0) {
+                                clearInterval(cooldownInterval);
+                                cooldownInterval = null;
+                                clearCooldown();
+                                if (utilsLoaded) {
+                                    submitBtn.disabled = false;
+                                    submitBtn.textContent = 'Join the Waitlist';
+                                    submitBtn.style.backgroundColor = '';
+                                }
+                            } else {
+                                const newSeconds = Math.ceil(newRemaining / 1000);
+                                submitBtn.textContent = `Wait ${newSeconds}s`;
+                            }
+                        }, 100);
+                    }
+                }
+                return true; // Cooldown active
+            }
+            return false; // No cooldown
+        }
+
+        // Fetch user IP
+        fetch("https://ipapi.co/json")
+            .then(res => res.json())
+            .then(data => {
+                userIP = data.ip;
+                userCountry = data.country_code;
+            })
+            .catch(() => {
+                userIP = 'unknown';
+                userCountry = 'us';
+            });
+        
         const iti = window.intlTelInput(input, {
             initialCountry: "auto",
             geoIpLookup: function(success, failure) {
-                fetch("https://ipapi.co/json")
-                    .then(res => res.json())
-                    .then(data => {
-                        userCountry = data.country_code;
-                        success(data.country_code);
-                    })
-                    .catch(() => success("us"));
+                // Use already fetched country or fetch again
+                if (userCountry && userCountry !== 'us') {
+                    success(userCountry);
+                } else {
+                    fetch("https://ipapi.co/json")
+                        .then(res => res.json())
+                        .then(data => {
+                            userIP = data.ip;
+                            userCountry = data.country_code;
+                            success(data.country_code);
+                        })
+                        .catch(() => success("us"));
+                }
             },
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/utils.js"
         });
+
+        // Don't show cooldown UI on page load, just check if it exists
+        const hasCooldown = getCooldownRemaining() > 0;
 
         // Wait for utils script to load
         iti.promise.then(() => {
             console.log('utils loaded');
             utilsLoaded = true;
+            // Enable button regardless of cooldown (user needs to click to see cooldown)
             submitBtn.disabled = false;
             submitBtn.textContent = 'Join the Waitlist';
         }).catch(() => {
@@ -91,13 +255,43 @@
                 }, 1000);
                 return;
             }
+
+            // Guard: Check if in cooldown and show countdown if trying to submit again
+            if (getCooldownRemaining() > 0) {
+                updateCooldownUI(true); // Force show the countdown
+                return;
+            }
+
+            // Start cooldown silently (no UI update yet)
+            setCooldown();
             
             // Disable button and show loading state
             submitBtn.disabled = true;
-            const originalText = submitBtn.textContent;
-            submitBtn.textContent = 'Joining...';
+            const originalText = 'Join the Waitlist';
+            submitBtn.textContent = 'Checking...';
 
             try {
+                // Check rate limits
+                if (!userIP) {
+                    // Try to fetch IP if we don't have it
+                    try {
+                        const ipResponse = await fetch("https://ipapi.co/json");
+                        const ipData = await ipResponse.json();
+                        userIP = ipData.ip;
+                    } catch {
+                        userIP = 'unknown';
+                    }
+                }
+
+                const rateLimitCheck = await checkRateLimits(userIP);
+                if (rateLimitCheck.limited) {
+                    throw new Error(rateLimitCheck.reason);
+                }
+
+                submitBtn.textContent = 'Joining...';
+                
+                const deviceId = rateLimitCheck.deviceId;
+                const ipHash = rateLimitCheck.ipHash;
                 // Get the phone number
                 const phoneNumber = iti.getNumber();
                 
@@ -131,7 +325,9 @@
                     .insert({
                         phone_number: finalPhoneNumber,
                         country_code: countryData.iso2.toUpperCase(),
-                        ip_country: userCountry ? userCountry.toUpperCase() : null
+                        ip_country: userCountry ? userCountry.toUpperCase() : null,
+                        device_id: deviceId,
+                        ip_hash: ipHash
                     });
 
                 if (error) {
@@ -142,12 +338,15 @@
                     throw error;
                 }
 
+                // Success - record submission for rate limiting
+                await recordSubmission(userIP);
+
                 // Success - show feedback
                 submitBtn.textContent = '✓ You\'re on the list!';
                 submitBtn.style.backgroundColor = '#2d7a2d';
                 input.value = '';
                 
-                // Reset after 3 seconds
+                // Reset button after 3 seconds (but cooldown remains active in background)
                 setTimeout(() => {
                     submitBtn.textContent = originalText;
                     submitBtn.style.backgroundColor = '';
@@ -159,7 +358,7 @@
                 submitBtn.textContent = error.message || 'Something went wrong';
                 submitBtn.style.backgroundColor = '#d32f2f';
                 
-                // Reset after 3 seconds
+                // Reset button after 3 seconds (but cooldown remains active in background)
                 setTimeout(() => {
                     submitBtn.textContent = originalText;
                     submitBtn.style.backgroundColor = '';
