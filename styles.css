@@ -137,6 +137,24 @@ h1 {
 h1 span {
     display: block;
     line-height: 1.1;
+    opacity: 0; /* Hide initially to prevent flash */
+}
+
+/* Custom animation delays for animate.css */
+.animate__delay-first {
+    animation-delay: 0.2s;
+}
+
+.animate__delay-second {
+    animation-delay: 0.75s;
+}
+
+.animate__delay-third {
+    animation-delay: 1.3s;
+}
+
+.animate__delay-phone {
+    animation-delay: 1.75s;
 }
 
 .footer {

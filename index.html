@@ -8,6 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/css/intlTelInput.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -15,14 +16,16 @@
         <div class="main-content">
             <div class="left-column">
                 <h1>
-                    <span>Manifest.</span>
-                    <span>Your.</span>
-                    <span>Destiny.</span>
+                    <span class="animate__animated animate__fadeIn animate__delay-first">Manifest.</span>
+                    <span class="animate__animated animate__fadeIn animate__delay-second">Your.</span>
+                    <span class="animate__animated animate__fadeIn animate__delay-third">Destiny.</span>
                 </h1>
             </div>
             <div class="right-column">
                 <div class="phone-container">
-                    <input type="tel" id="phone" placeholder="Enter your phone number">
+                    <div class="animate__animated animate__swing animate__delay-phone">
+                        <input type="tel" id="phone" placeholder="Enter your phone number">
+                    </div>
                     <button class="submit-btn">Join the Waitlist</button>
                 </div>
             </div>
