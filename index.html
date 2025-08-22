@@ -99,22 +99,12 @@
             saveRateLimitData(rateLimits);
         }
 
-        // UI Cooldown management
-        function setCooldown() {
-            const cooldownExpiry = Date.now() + 45000; // 45 seconds
-            localStorage.setItem('manifest_cooldown_expiry', cooldownExpiry);
-            return cooldownExpiry;
-        }
-
-        function getCooldownRemaining() {
-            const expiry = localStorage.getItem('manifest_cooldown_expiry');
-            if (!expiry) return 0;
-            const remaining = parseInt(expiry) - Date.now();
-            return remaining > 0 ? remaining : 0;
-        }
-
-        function clearCooldown() {
-            localStorage.removeItem('manifest_cooldown_expiry');
+        // Check if device has already submitted today
+        function hasDeviceSubmittedToday() {
+            const deviceId = getOrCreateDeviceId();
+            const today = getUTCDateString();
+            const rateLimits = getRateLimitData();
+            return rateLimits.device_submissions[today]?.[deviceId] >= 1;
         }
 
         // Initialize phone input
@@ -122,44 +112,16 @@
         const submitBtn = document.querySelector(".submit-btn");
         let userCountry = 'us';
         let utilsLoaded = false;
-        let cooldownInterval = null;
         
-        // Disable submit button by default until utils are loaded
-        submitBtn.disabled = true;
-        submitBtn.textContent = 'Loading...';
-        
-        // Cooldown UI update function
-        function updateCooldownUI(forceShow = false) {
-            const remaining = getCooldownRemaining();
-            if (remaining > 0) {
-                if (forceShow) {
-                    const seconds = Math.ceil(remaining / 1000);
-                    submitBtn.disabled = true;
-                    submitBtn.textContent = `Wait ${seconds}s`;
-                    submitBtn.style.backgroundColor = '#666';
-                    
-                    if (!cooldownInterval) {
-                        cooldownInterval = setInterval(() => {
-                            const newRemaining = getCooldownRemaining();
-                            if (newRemaining <= 0) {
-                                clearInterval(cooldownInterval);
-                                cooldownInterval = null;
-                                clearCooldown();
-                                if (utilsLoaded) {
-                                    submitBtn.disabled = false;
-                                    submitBtn.textContent = 'Join the Waitlist';
-                                    submitBtn.style.backgroundColor = '';
-                                }
-                            } else {
-                                const newSeconds = Math.ceil(newRemaining / 1000);
-                                submitBtn.textContent = `Wait ${newSeconds}s`;
-                            }
-                        }, 100);
-                    }
-                }
-                return true; // Cooldown active
-            }
-            return false; // No cooldown
+        // Check if device already submitted today
+        if (hasDeviceSubmittedToday()) {
+            submitBtn.disabled = true;
+            submitBtn.textContent = '✓ You\'re on the list!';
+            submitBtn.style.backgroundColor = '#2d7a2d';
+        } else {
+            // Disable submit button by default until utils are loaded
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Loading...';
         }
 
         // Fetch user country for phone input
@@ -191,28 +153,31 @@
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/utils.js"
         });
 
-        // Don't show cooldown UI on page load, just check if it exists
-        const hasCooldown = getCooldownRemaining() > 0;
-
         // Wait for utils script to load
         iti.promise.then(() => {
             console.log('utils loaded');
             utilsLoaded = true;
-            // Enable button regardless of cooldown (user needs to click to see cooldown)
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Join the Waitlist';
+            // Only enable button if device hasn't submitted today
+            if (!hasDeviceSubmittedToday()) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Join the Waitlist';
+            }
         }).catch(() => {
             console.error('Failed to load utils script');
             // Fallback: check if utils are already loaded
             if (window.intlTelInputUtils) {
                 console.log('utils loaded (fallback)');
                 utilsLoaded = true;
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Join the Waitlist';
+                if (!hasDeviceSubmittedToday()) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Join the Waitlist';
+                }
             } else {
                 // Still enable button but with limited functionality
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Join the Waitlist';
+                if (!hasDeviceSubmittedToday()) {
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Join the Waitlist';
+                }
             }
         });
 
@@ -228,14 +193,6 @@
                 return;
             }
 
-            // Guard: Check if in cooldown and show countdown if trying to submit again
-            if (getCooldownRemaining() > 0) {
-                updateCooldownUI(true); // Force show the countdown
-                return;
-            }
-
-            // Start cooldown silently (no UI update yet)
-            setCooldown();
             
             // Disable button and show loading state
             submitBtn.disabled = true;
@@ -246,7 +203,12 @@
                 // Check device rate limit (client-side)
                 const deviceCheck = checkDeviceRateLimit();
                 if (deviceCheck.limited) {
-                    throw new Error(deviceCheck.reason);
+                    // Show persistent success state since they already submitted today
+                    submitBtn.textContent = '✓ You\'re on the list!';
+                    submitBtn.style.backgroundColor = '#2d7a2d';
+                    submitBtn.disabled = true;
+                    // Don't reset the button - keep it in success state
+                    return;
                 }
 
                 submitBtn.textContent = 'Joining...';
@@ -310,24 +272,19 @@
                 // Success - record device submission for client-side rate limiting
                 recordDeviceSubmission();
 
-                // Success - show feedback
+                // Success - show persistent feedback
                 submitBtn.textContent = '✓ You\'re on the list!';
                 submitBtn.style.backgroundColor = '#2d7a2d';
                 input.value = '';
-                
-                // Reset button after 3 seconds (but cooldown remains active in background)
-                setTimeout(() => {
-                    submitBtn.textContent = originalText;
-                    submitBtn.style.backgroundColor = '';
-                    submitBtn.disabled = false;
-                }, 3000);
+                submitBtn.disabled = true;
+                // Don't reset - keep success state since device limit is now reached
 
             } catch (error) {
                 // Show error message
                 submitBtn.textContent = error.message || 'Something went wrong';
                 submitBtn.style.backgroundColor = '#d32f2f';
                 
-                // Reset button after 3 seconds (but cooldown remains active in background)
+                // Reset button after 3 seconds for errors
                 setTimeout(() => {
                     submitBtn.textContent = originalText;
                     submitBtn.style.backgroundColor = '';
