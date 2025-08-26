@@ -1,6 +1,18 @@
 // CORS-first, lazy import supabase-js, robust preflight handling, IP rate-limit (3/day UTC)
 
-const SALT = Deno.env.get("IP_HASH_SALT") ?? "manifest_salt_2025";
+// Helper to ensure required env vars are present at cold start
+function need(key: string): string {
+  const value = Deno.env.get(key);
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`);
+  }
+  return value;
+}
+
+// Load and validate all required env vars at cold start
+const SUPABASE_URL = need("SUPABASE_URL");
+const SERVICE_ROLE = need("SUPABASE_SERVICE_ROLE_KEY");
+const IP_HASH_SALT = need("IP_HASH_SALT");
 
 function makeCorsHeaders(req: Request) {
   const origin = req.headers.get("origin") ?? "*";
@@ -65,22 +77,13 @@ Deno.serve(async (req) => {
     // Lazy import to avoid crashing OPTIONS on module fetch issues
     const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2");
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    if (!SUPABASE_URL || !SERVICE_ROLE) {
-      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
-        status: 500,
-        headers: cors,
-      });
-    }
-
     const supabase = createClient(SUPABASE_URL, SERVICE_ROLE, {
       auth: { persistSession: false },
     });
 
     // Compute short hash (16 hex chars) for the IP
     const ip = getClientIP(req);
-    const ip_hash = (await sha256Hex(ip + SALT)).slice(0, 16);
+    const ip_hash = (await sha256Hex(ip + IP_HASH_SALT)).slice(0, 16);
 
     // Count today's submissions (UTC) for this IP without fetching rows
     const since = startOfTodayUTC();
