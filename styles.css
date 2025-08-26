@@ -144,7 +144,6 @@ h1 span {
 /* Ensure animations don't flash */
 .animate__animated {
     animation-fill-mode: both;
-    animation-play-state: paused;
 }
 
 /* Custom animation delays for animate.css */
