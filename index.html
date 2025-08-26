@@ -367,14 +367,22 @@
     <script>
         // Ensure animations start fresh on page load
         document.addEventListener('DOMContentLoaded', function() {
-            // Small delay to ensure everything is rendered
-            setTimeout(function() {
-                // Start all animations
-                const animated = document.querySelectorAll('.animate__animated');
-                animated.forEach(el => {
-                    el.style.animationPlayState = 'running';
+            const animated = document.querySelectorAll('.animate__animated');
+            
+            // Force browser to recalculate styles (force reflow)
+            animated.forEach(el => {
+                void el.offsetHeight; // Force reflow
+            });
+            
+            // Use double requestAnimationFrame for better timing
+            // This ensures we're synced with the browser's render cycle
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    animated.forEach(el => {
+                        el.style.animationPlayState = 'running';
+                    });
                 });
-            }, 100);
+            });
         });
     </script>
 </body>
