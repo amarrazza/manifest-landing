@@ -28,7 +28,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/css/intlTelInput.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -36,14 +35,14 @@
         <div class="main-content">
             <div class="left-column">
                 <h1>
-                    <span class="animate__animated animate__fadeIn animate__delay-first">Manifest.</span>
-                    <span class="animate__animated animate__fadeIn animate__delay-second">Your.</span>
-                    <span class="animate__animated animate__fadeIn animate__delay-third">Destiny.</span>
+                    <span>Manifest.</span>
+                    <span>Your.</span>
+                    <span>Destiny.</span>
                 </h1>
             </div>
             <div class="right-column">
                 <div class="phone-container">
-                    <div class="animate__animated animate__swing animate__delay-phone">
+                    <div class="phone-input-wrapper">
                         <input type="tel" id="phone" placeholder="Enter your phone number">
                     </div>
                     <button class="submit-btn">Join the Waitlist</button>
@@ -365,30 +364,70 @@
     </script>
     
     <script>
-        // Force animations to restart on page load
+        // Moved to Web Animations API due to Safari opacity timing issues with CSS animations
         document.addEventListener('DOMContentLoaded', function() {
-            const animated = document.querySelectorAll('.animate__animated');
+            const headlines = document.querySelectorAll('h1 span');
+            const phoneInput = document.querySelector('#phone');
             
-            animated.forEach(el => {
-                // Store the original classes
-                const classes = el.className;
+            // Feature detection for WAAPI
+            const supportsWAAPI = typeof Element.prototype.animate === 'function';
+            
+            // Check for reduced motion preference
+            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            
+            // If no WAAPI support or reduced motion, just show content
+            if (!supportsWAAPI || prefersReducedMotion) {
+                headlines.forEach(span => {
+                    span.style.opacity = '1';
+                });
+                return;
+            }
+            
+            // Wait for fonts to load to prevent text flash during animation
+            const animateHeadlines = () => {
+                headlines.forEach((span, index) => {
+                    span.animate([
+                        { opacity: 0 },
+                        { opacity: 1 }
+                    ], {
+                        duration: 600,
+                        delay: index * 300, // 0.3s stagger
+                        easing: 'ease-out',
+                        fill: 'forwards'
+                    });
+                });
                 
-                // Remove animation by setting to none
-                el.style.animation = 'none';
+                // Phone input pulse (desktop only, once, if not already focused)
+                const isMobile = window.innerWidth <= 768;
+                const inputFocused = document.activeElement === phoneInput;
                 
-                // Force browser to recalculate (reflow)
-                el.offsetHeight;
-                
-                // Restore animation after reflow
-                setTimeout(() => {
-                    el.style.animation = '';
-                    // Force re-apply classes to restart animation
-                    el.className = '';
-                    void el.offsetHeight; // Force another reflow
-                    el.className = classes;
-                }, 10);
-            });
+                if (phoneInput && !isMobile && !inputFocused) {
+                    setTimeout(() => {
+                        phoneInput.parentElement.animate([
+                            { transform: 'scale(1)' },
+                            { transform: 'scale(1.05)' },
+                            { transform: 'scale(1)' }
+                        ], {
+                            duration: 400,
+                            easing: 'ease-in-out'
+                        });
+                    }, 2200);
+                }
+            };
+            
+            // Wait for fonts or fallback after 100ms
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(animateHeadlines);
+            } else {
+                setTimeout(animateHeadlines, 100);
+            }
         });
     </script>
+    
+    <noscript>
+        <style>
+            h1 span { opacity: 1 !important; }
+        </style>
+    </noscript>
 </body>
 </html>

@@ -137,31 +137,9 @@ h1 {
 h1 span {
     display: block;
     line-height: 1.1;
-    opacity: 0;
-    will-change: opacity;
+    opacity: 0; /* Revealed via WAAPI or fallback */
 }
 
-/* Ensure animations don't flash */
-.animate__animated {
-    animation-fill-mode: both;
-}
-
-/* Custom animation delays for animate.css */
-.animate__delay-first {
-    animation-delay: 0.2s;
-}
-
-.animate__delay-second {
-    animation-delay: 0.75s;
-}
-
-.animate__delay-third {
-    animation-delay: 1.3s;
-}
-
-.animate__delay-phone {
-    animation-delay: 2.2s;
-}
 
 .footer {
     padding: 20px 60px;
@@ -208,13 +186,6 @@ h1 span {
 }
 
 @media (max-width: 768px) {
-    /* Override swing with pulse on mobile, repeating every 10s */
-    .animate__swing {
-        animation-name: pulse !important;
-        animation-iteration-count: infinite !important;
-        animation-duration: 1s !important;
-    }
-    
     .card {
         grid-template-rows: 1fr auto;
     }
