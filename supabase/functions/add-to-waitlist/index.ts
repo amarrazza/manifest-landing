@@ -14,18 +14,32 @@ const SUPABASE_URL = need("SUPABASE_URL");
 const SERVICE_ROLE = need("SUPABASE_SERVICE_ROLE_KEY");
 const IP_HASH_SALT = need("IP_HASH_SALT");
 
+// Allowed origins whitelist for CORS
+const ALLOWED_ORIGINS = [
+  'http://localhost:8000',
+  'https://manifestios.com',
+  'https://www.manifestios.com'
+];
+
 function makeCorsHeaders(req: Request) {
-  const origin = req.headers.get("origin") ?? "*";
+  const origin = req.headers.get("origin");
   const reqHeaders =
     req.headers.get("access-control-request-headers") ?? "content-type";
-  return {
-    "Access-Control-Allow-Origin": origin,
+  
+  // Only set Access-Control-Allow-Origin if origin is in whitelist
+  const corsHeaders: Record<string, string> = {
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Allow-Headers": reqHeaders,
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin",
     "Content-Type": "application/json",
   };
+  
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    corsHeaders["Access-Control-Allow-Origin"] = origin;
+  }
+  
+  return corsHeaders;
 }
 
 function getClientIP(req: Request): string {
@@ -54,6 +68,15 @@ Deno.serve(async (req) => {
   // --- Preflight must NEVER error ---
   if (req.method === "OPTIONS") {
     return new Response("ok", { status: 200, headers: cors });
+  }
+
+  // Enforce origin check for non-OPTIONS requests
+  const origin = req.headers.get('origin');
+  if (!origin || !ALLOWED_ORIGINS.includes(origin)) {
+    return new Response(JSON.stringify({ error: 'Forbidden' }), {
+      status: 403,
+      headers: cors
+    });
   }
 
   if (req.method !== "POST") {
