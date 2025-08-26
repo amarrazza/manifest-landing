@@ -137,7 +137,11 @@ h1 {
 h1 span {
     display: block;
     line-height: 1.1;
-    opacity: 0; /* Hide initially to prevent flash */
+}
+
+/* Ensure animations don't flash */
+.animate__animated {
+    animation-fill-mode: both;
 }
 
 /* Custom animation delays for animate.css */
@@ -202,6 +206,13 @@ h1 span {
 }
 
 @media (max-width: 768px) {
+    /* Override swing with pulse on mobile, repeating every 10s */
+    .animate__swing {
+        animation-name: pulse !important;
+        animation-iteration-count: infinite !important;
+        animation-duration: 10s !important;
+    }
+    
     .card {
         grid-template-rows: 1fr auto;
     }
