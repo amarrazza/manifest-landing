@@ -17,6 +17,7 @@ const IP_HASH_SALT = need("IP_HASH_SALT");
 // Allowed origins whitelist for CORS
 const ALLOWED_ORIGINS = [
   'http://localhost:8000',
+  'https://manifest-landing.vercel.app',
   'https://manifestios.com',
   'https://www.manifestios.com'
 ];
