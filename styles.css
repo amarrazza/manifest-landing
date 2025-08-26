@@ -137,28 +137,31 @@ h1 {
 h1 span {
     display: block;
     line-height: 1.1;
+    opacity: 0;
+    will-change: opacity;
 }
 
 /* Ensure animations don't flash */
 .animate__animated {
     animation-fill-mode: both;
+    animation-play-state: paused;
 }
 
 /* Custom animation delays for animate.css */
 .animate__delay-first {
-    animation-delay: 0.2s;
+    animation-delay: 0.3s;
 }
 
 .animate__delay-second {
-    animation-delay: 0.75s;
+    animation-delay: 0.85s;
 }
 
 .animate__delay-third {
-    animation-delay: 1.3s;
+    animation-delay: 1.4s;
 }
 
 .animate__delay-phone {
-    animation-delay: 2.2s;
+    animation-delay: 2.3s;
 }
 
 .footer {
@@ -210,7 +213,6 @@ h1 span {
     .animate__swing {
         animation-name: pulse !important;
         animation-iteration-count: infinite !important;
-        animation-duration: 10s !important;
     }
     
     .card {

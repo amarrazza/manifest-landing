@@ -363,5 +363,19 @@
             }
         });
     </script>
+    
+    <script>
+        // Ensure animations start fresh on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Small delay to ensure everything is rendered
+            setTimeout(function() {
+                // Start all animations
+                const animated = document.querySelectorAll('.animate__animated');
+                animated.forEach(el => {
+                    el.style.animationPlayState = 'running';
+                });
+            }, 100);
+        });
+    </script>
 </body>
 </html>
