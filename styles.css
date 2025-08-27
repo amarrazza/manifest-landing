@@ -192,6 +192,8 @@ h1 span {
 
 @media (max-width: 768px) {
     .card {
+        height: 92dvh;
+        min-height: 92svh;
         grid-template-rows: 1fr auto;
     }
     
