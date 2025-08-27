@@ -239,6 +239,7 @@ h1 span {
     
     .footer-text {
         font-size: 12px;
+        font-weight: 700;
     }
     
     .footer-text:first-child {
@@ -252,7 +253,7 @@ h1 span {
     }
     
     .x-logo {
-        height: 13px;
-        margin-top: -5px;
+        height: 16px;
+        margin-top: -6px;
     }
 }
