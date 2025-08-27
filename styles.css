@@ -5,8 +5,11 @@
 }
 
 html, body {
-    height: 100vh;
-    overflow: hidden;
+    height: 100dvh;
+    min-height: 100svh;
+    overflow: clip;
+    overflow: hidden; /* Fallback for browsers that don't support clip */
+    overscroll-behavior: none;
 }
 
 body {
@@ -21,7 +24,8 @@ body {
 
 .card {
     width: 85vw;
-    height: 85vh;
+    height: 85dvh;
+    min-height: 85svh;
     background-color: #CB6120;
     border-radius: 24px;
     display: grid;
@@ -143,6 +147,7 @@ h1 span {
 
 .footer {
     padding: 20px 60px;
+    padding-bottom: max(env(safe-area-inset-bottom), 20px);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -233,6 +238,7 @@ h1 span {
     
     .footer {
         padding: 10px 30px;
+        padding-bottom: max(env(safe-area-inset-bottom), 10px);
         font-size: 12px;
         gap: 10px;
     }
