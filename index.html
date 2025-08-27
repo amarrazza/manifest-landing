@@ -144,7 +144,7 @@
         // Initialize phone input
         const input = document.querySelector("#phone");
         const submitBtn = document.querySelector(".submit-btn");
-        const phoneWrapper = document.querySelector('.animate__swing');
+        const phoneWrapper = document.querySelector('.phone-input-wrapper');
         let userCountry = 'us';
         let utilsLoaded = false;
         let animationInterval;
@@ -330,12 +330,20 @@
             }
         });
 
-        // Function to replay swing animation
+        // Function to replay swing animation using WAAPI
         function replaySwing() {
             if (!hasUserInteracted && !hasDeviceSubmittedToday() && input.value.trim() === '') {
-                phoneWrapper.classList.remove('animate__swing');
-                void phoneWrapper.offsetWidth; // Force browser reflow
-                phoneWrapper.classList.add('animate__swing');
+                phoneWrapper.animate([
+                    { transform: 'rotate(0deg)' },
+                    { transform: 'rotate(3deg)' },
+                    { transform: 'rotate(-3deg)' },
+                    { transform: 'rotate(2deg)' },
+                    { transform: 'rotate(-1deg)' },
+                    { transform: 'rotate(0deg)' }
+                ], {
+                    duration: 1000,
+                    easing: 'ease-in-out'
+                });
             }
         }
 
@@ -396,23 +404,6 @@
                         fill: 'forwards'
                     });
                 });
-                
-                // Phone input pulse (desktop only, once, if not already focused)
-                const isMobile = window.innerWidth <= 768;
-                const inputFocused = document.activeElement === phoneInput;
-                
-                if (phoneInput && !isMobile && !inputFocused) {
-                    setTimeout(() => {
-                        phoneInput.parentElement.animate([
-                            { transform: 'scale(1)' },
-                            { transform: 'scale(1.05)' },
-                            { transform: 'scale(1)' }
-                        ], {
-                            duration: 400,
-                            easing: 'ease-in-out'
-                        });
-                    }, 2200);
-                }
             };
             
             // Wait for fonts or fallback after 100ms
