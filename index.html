@@ -54,7 +54,7 @@
             <img src="manifest-logo.svg" alt="Manifest" class="manifest-logo">
             <div class="follow-section">
                 <span class="footer-text">Follow us on</span>
-                <a href="#" class="social-link">
+                <a href="https://x.com/manifestios" class="social-link" target="_blank" rel="noopener noreferrer">
                     <img src="x-logo.svg" alt="X" class="x-logo">
                 </a>
             </div>
@@ -335,10 +335,10 @@
             if (!hasUserInteracted && !hasDeviceSubmittedToday() && input.value.trim() === '') {
                 phoneWrapper.animate([
                     { transform: 'rotate(0deg)' },
-                    { transform: 'rotate(3deg)' },
+                    { transform: 'rotate(6deg)' },
+                    { transform: 'rotate(-6deg)' },
+                    { transform: 'rotate(4deg)' },
                     { transform: 'rotate(-3deg)' },
-                    { transform: 'rotate(2deg)' },
-                    { transform: 'rotate(-1deg)' },
                     { transform: 'rotate(0deg)' }
                 ], {
                     duration: 1000,
@@ -347,28 +347,6 @@
             }
         }
 
-        // Start repeating animation after initial animation completes
-        setTimeout(() => {
-            if (!hasDeviceSubmittedToday()) {
-                // Replay animation every 15 seconds
-                animationInterval = setInterval(replaySwing, 4000);
-            }
-        }, 1000); // Wait for initial animation to complete
-
-        // Stop animations when user interacts with input
-        input.addEventListener('focus', () => {
-            hasUserInteracted = true;
-            if (animationInterval) {
-                clearInterval(animationInterval);
-            }
-        });
-
-        input.addEventListener('input', () => {
-            hasUserInteracted = true;
-            if (animationInterval) {
-                clearInterval(animationInterval);
-            }
-        });
     </script>
     
     <script>
@@ -391,7 +369,7 @@
                 return;
             }
             
-            // Wait for fonts to load to prevent text flash during animation
+            // Animate headlines with consistent timing
             const animateHeadlines = () => {
                 headlines.forEach((span, index) => {
                     span.animate([
@@ -399,19 +377,39 @@
                         { opacity: 1 }
                     ], {
                         duration: 1000,
-                        delay: index * 700, // 0.3s stagger
+                        delay: index * 600, // 100ms buffer + 0.6s stagger
                         easing: 'ease-out',
                         fill: 'forwards'
                     });
                 });
             };
             
-            // Wait for fonts or fallback after 100ms
-            if (document.fonts && document.fonts.ready) {
-                document.fonts.ready.then(animateHeadlines);
-            } else {
-                setTimeout(animateHeadlines, 100);
-            }
+            // Use consistent timing for animations
+            setTimeout(animateHeadlines, 100);
+            
+            // Start repeating swing animation after initial delay
+            setTimeout(() => {
+                if (!hasDeviceSubmittedToday()) {
+                    replaySwing(); // Call immediately for first swing
+                    // Replay animation every 4 seconds
+                    animationInterval = setInterval(replaySwing, 4000);
+                }
+            }, 2250); // Initial delay
+            
+            // Stop animations when user interacts with input
+            input.addEventListener('focus', () => {
+                hasUserInteracted = true;
+                if (animationInterval) {
+                    clearInterval(animationInterval);
+                }
+            });
+            
+            input.addEventListener('input', () => {
+                hasUserInteracted = true;
+                if (animationInterval) {
+                    clearInterval(animationInterval);
+                }
+            });
         });
     </script>
     
