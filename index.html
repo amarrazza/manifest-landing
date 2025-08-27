@@ -364,7 +364,7 @@
     </script>
     
     <script>
-        // Moved to Web Animations API due to Safari opacity timing issues with CSS animations
+        // Moved to Web Animations API due to Safari issues with CSS animations
         document.addEventListener('DOMContentLoaded', function() {
             const headlines = document.querySelectorAll('h1 span');
             const phoneInput = document.querySelector('#phone');
@@ -372,11 +372,11 @@
             // Feature detection for WAAPI
             const supportsWAAPI = typeof Element.prototype.animate === 'function';
             
-            // Check for reduced motion preference
-            const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            // Bypassing reduced motion check to test mobile animations
+            // const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
             
-            // If no WAAPI support or reduced motion, just show content
-            if (!supportsWAAPI || prefersReducedMotion) {
+            // If no WAAPI support, just show content
+            if (!supportsWAAPI) {
                 headlines.forEach(span => {
                     span.style.opacity = '1';
                 });
@@ -390,8 +390,8 @@
                         { opacity: 0 },
                         { opacity: 1 }
                     ], {
-                        duration: 600,
-                        delay: index * 300, // 0.3s stagger
+                        duration: 1000,
+                        delay: index * 700, // 0.3s stagger
                         easing: 'ease-out',
                         fill: 'forwards'
                     });
