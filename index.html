@@ -260,7 +260,7 @@
                 
                 // Basic validation: check if we have a reasonable phone number
                 // Allow if it's either strictly valid OR looks like a phone number
-                const hasReasonableLength = input.value.replace(/\D/g, '').length >= 10;
+                const hasReasonableLength = input.value.replace(/\D/g, '').length >= 9;
                 const isStrictlyValid = iti.isValidNumber && iti.isValidNumber();
                 
                 if (!isStrictlyValid && !hasReasonableLength) {
