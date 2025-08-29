@@ -149,6 +149,7 @@
         let utilsLoaded = false;
         let animationInterval;
         let hasUserInteracted = false;
+        let iti; // Store intl-tel-input instance globally
         
         // Check if device already submitted today
         if (hasDeviceSubmittedToday()) {
@@ -161,34 +162,68 @@
             submitBtn.textContent = 'Join the Waitlist';
         }
 
-        // Fetch user country for phone input
-        fetch("https://ipapi.co/json")
-            .then(res => res.json())
-            .then(data => {
-                userCountry = data.country_code;
-            })
-            .catch(() => {
-                userCountry = 'us';
-            });
-        
-        const iti = window.intlTelInput(input, {
-            initialCountry: "auto",
-            geoIpLookup: function(success, failure) {
-                // Use already fetched country or fetch again
-                if (userCountry && userCountry !== 'us') {
-                    success(userCountry);
-                } else {
-                    fetch("https://ipapi.co/json")
-                        .then(res => res.json())
-                        .then(data => {
-                            userCountry = data.country_code;
-                            success(data.country_code);
-                        })
-                        .catch(() => success("us"));
+        // Helper function to get cached country code
+        function getCachedCountryCode() {
+            const cached = localStorage.getItem('geo_country');
+            if (cached) {
+                const data = JSON.parse(cached);
+                // Check if cache is less than 24 hours old
+                if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
+                    return data.country;
                 }
-            },
+            }
+            return null;
+        }
+
+        // Helper function to cache country code
+        function cacheCountryCode(country) {
+            localStorage.setItem('geo_country', JSON.stringify({
+                country: country,
+                timestamp: Date.now()
+            }));
+        }
+
+        // Null-safe helper to get selected country ISO code
+        function getSelectedCountryCode() {
+            try {
+                const countryData = iti.getSelectedCountryData();
+                if (countryData && countryData.iso2) {
+                    return countryData.iso2.toUpperCase();
+                }
+            } catch (e) {
+                console.warn('Error getting country code:', e);
+            }
+            return null;
+        }
+
+        // Initialize with default country first
+        iti = window.intlTelInput(input, {
+            initialCountry: "us", // Safe default
             utilsScript: "https://cdn.jsdelivr.net/npm/intl-tel-input@25.3.2/build/js/utils.js"
         });
+
+        // After initialization, try to get better country code asynchronously
+        const cachedCountry = getCachedCountryCode();
+        if (cachedCountry) {
+            // Use cached country
+            userCountry = cachedCountry;
+            iti.setCountry(cachedCountry.toLowerCase());
+        } else {
+            // Fetch fresh country code
+            fetch("https://ipapi.co/json")
+                .then(res => res.json())
+                .then(data => {
+                    if (data.country_code) {
+                        userCountry = data.country_code;
+                        cacheCountryCode(data.country_code);
+                        iti.setCountry(data.country_code.toLowerCase());
+                    }
+                })
+                .catch(() => {
+                    // Silent fail, keep default
+                    console.log('Geo lookup failed, using default country');
+                });
+        }
 
         // Wait for utils script to load
         iti.promise.then(() => {
@@ -224,6 +259,39 @@
                 setTimeout(() => {
                     submitBtn.textContent = 'Join the Waitlist';
                 }, 1000);
+                return;
+            }
+
+            // Check if country is selected
+            const countryCode = getSelectedCountryCode();
+            if (!countryCode) {
+                // No country selected - show friendly error
+                submitBtn.textContent = 'Choose your country code first';
+                submitBtn.style.backgroundColor = '#ff9800';
+                
+                // Add error styling to phone wrapper
+                phoneWrapper.style.border = '2px solid #ff9800';
+                
+                // Open the country dropdown programmatically
+                const countryButton = input.parentElement.querySelector('.iti__selected-flag');
+                if (countryButton) {
+                    countryButton.click();
+                    // Focus on the search box if it exists
+                    setTimeout(() => {
+                        const searchBox = document.querySelector('.iti__search-input');
+                        if (searchBox) {
+                            searchBox.focus();
+                        }
+                    }, 100);
+                }
+                
+                // Revert UI after 2.5 seconds
+                setTimeout(() => {
+                    submitBtn.textContent = 'Join the Waitlist';
+                    submitBtn.style.backgroundColor = '';
+                    phoneWrapper.style.border = '';
+                }, 2500);
+                
                 return;
             }
 
@@ -269,7 +337,9 @@
                 
                 // Use E.164 format if available, otherwise format it ourselves
                 const finalPhoneNumber = phoneNumber || '+1' + input.value.replace(/\D/g, '');
-                const countryData = iti.getSelectedCountryData();
+                
+                // Get country code safely
+                const safeCountryCode = getSelectedCountryCode() || 'US';
 
                 // Call Edge Function instead of direct insert
                 const response = await fetch(`${supabaseUrl}/functions/v1/add-to-waitlist`, {
@@ -280,7 +350,7 @@
                     },
                     body: JSON.stringify({
                         phone_number: finalPhoneNumber,
-                        country_code: countryData.iso2.toUpperCase(),
+                        country_code: safeCountryCode,
                         ip_country: userCountry ? userCountry.toUpperCase() : null,
                         device_id: deviceId
                     })
