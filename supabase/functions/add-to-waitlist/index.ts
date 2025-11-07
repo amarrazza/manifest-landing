@@ -19,7 +19,9 @@ const ALLOWED_ORIGINS = [
   'http://localhost:8000',
   'https://manifest-landing.vercel.app',
   'https://manifestios.com',
-  'https://www.manifestios.com'
+  'https://www.manifestios.com',
+  'https://www.sway.xyz',
+  'https://sway.xyz',
 ];
 
 function makeCorsHeaders(req: Request) {
